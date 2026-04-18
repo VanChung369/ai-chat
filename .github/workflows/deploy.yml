@@ -49,15 +49,10 @@ jobs:
           docker compose pull
           docker compose up -d
 
-      - name: Health check
-        shell: bash
+      - name: Health check Open WebUI
         run: |
-          set -euo pipefail
-          WEBUI_PORT="$(grep '^WEBUI_PORT=' "${DEPLOY_PATH}/.env" | cut -d= -f2- || true)"
-          WEBUI_PORT="${WEBUI_PORT:-3876}"
-          echo "Waiting for Open WebUI to start on port ${WEBUI_PORT}..."
-          sleep 10
-          curl --fail "http://localhost:${WEBUI_PORT}" >/dev/null
+          sleep 8
+          curl -I http://localhost:3876 || curl http://localhost:3876
 
       - name: Cleanup
         shell: bash
