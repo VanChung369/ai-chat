@@ -1,0 +1,66 @@
+name: Deploy Open WebUI
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: deploy-open-webui-main
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    env:
+      DEPLOY_PATH: /home/vanchung/deploy/open-webui
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Prepare Deploy Directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${DEPLOY_PATH}"
+
+      - name: Sync source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rsync -av --delete \
+            --exclude ".git" \
+            --exclude ".github" \
+            --exclude ".env" \
+            ./ "${DEPLOY_PATH}/"
+
+      - name: Create .env file
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' "${{ secrets.ENV_FILE }}" > "${DEPLOY_PATH}/.env"
+
+      - name: Deploy with Docker Compose
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "${DEPLOY_PATH}"
+          docker compose pull
+          docker compose up -d
+
+      - name: Health check
+        shell: bash
+        run: |
+          set -euo pipefail
+          WEBUI_PORT="$(grep '^WEBUI_PORT=' "${DEPLOY_PATH}/.env" | cut -d= -f2- || true)"
+          WEBUI_PORT="${WEBUI_PORT:-3876}"
+          echo "Waiting for Open WebUI to start on port ${WEBUI_PORT}..."
+          sleep 10
+          curl --fail "http://localhost:${WEBUI_PORT}" >/dev/null
+
+      - name: Cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker image prune -f
